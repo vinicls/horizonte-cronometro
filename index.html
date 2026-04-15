@@ -356,6 +356,41 @@ body.dark .ph-rest  { background:#0a2518; color:#5DCAA5; }
 
 /* Título flutuante em execução */
 .running-title { position:fixed; left:50%; transform:translateX(-50%); font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-hint); white-space:nowrap; }
+
+/* ── Banner de instalação ── */
+.install-banner {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 9999;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-mid);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+  padding: 16px 20px;
+  align-items: center;
+  gap: 14px;
+  animation: slideUp 0.3s ease;
+}
+.install-banner.visible { display: flex; }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.install-banner-icon { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+.install-banner-text { flex: 1; }
+.install-banner-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.install-banner-sub   { font-size: 12px; color: var(--text-secondary); margin-top: 2px; line-height: 1.4; }
+.install-banner-sub .ios-icon { display: inline-block; width: 16px; height: 16px; vertical-align: middle; margin: 0 2px; }
+.install-banner-btns  { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.install-btn-yes {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; padding: 8px 16px;
+  font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  font-family: inherit;
+}
+.install-btn-no {
+  background: transparent; color: var(--text-secondary); border: none;
+  font-size: 12px; cursor: pointer; text-align: center;
+  font-family: inherit; padding: 2px;
+}
+.install-btn-no:hover { color: var(--text-primary); }
 </style>
 </head>
 <body>
@@ -480,7 +515,7 @@ body.dark .ph-rest  { background:#0a2518; color:#5DCAA5; }
 
   </main>
 
-  <footer class="footer">Horizonte Jiu Jitsu · Cronômetro v2.2</footer>
+  <footer class="footer">Horizonte Jiu Jitsu · Cronômetro v2.3</footer>
 </div>
 
 <div class="running-title" id="running-title">Horizonte Jiu Jitsu</div>
@@ -799,6 +834,86 @@ function skip() {
 function doReset() { bClick(); clearInterval(iv); iv=null; initSt(); render(); }
 
 sync(); initSt(); render();
+
+// ── Banner de instalação PWA ──────────────────────────────────────────────
+(function() {
+  const banner   = document.getElementById('install-banner');
+  const btnYes   = document.getElementById('install-btn-yes');
+  const btnNo    = document.getElementById('install-btn-no');
+  const titleEl  = document.getElementById('install-title');
+  const subEl    = document.getElementById('install-sub');
+
+  // Detecta iOS
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  // Detecta se já está instalado como PWA (standalone)
+  const isStandalone = window.navigator.standalone === true
+    || window.matchMedia('(display-mode: standalone)').matches;
+  // Detecta mobile
+  const isMobile = /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+
+  let deferredPrompt = null;
+
+  // Android: captura o evento de instalação
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (!isStandalone && isMobile) showBanner('android');
+  });
+
+  function showBanner(platform) {
+    // Não mostra se já foi dispensado nesta sessão
+    if (sessionStorage.getItem('install-dismissed')) return;
+
+    if (platform === 'ios') {
+      titleEl.textContent = 'Adicionar à tela inicial';
+      subEl.innerHTML = 'Toque em <svg class="ios-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> e depois em <strong>"Adicionar à Tela de Início"</strong>.';
+      btnYes.textContent = 'Entendi';
+      btnYes.onclick = function() { hideBanner(); };
+    } else {
+      btnYes.onclick = async function() {
+        hideBanner();
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          await deferredPrompt.userChoice;
+          deferredPrompt = null;
+        }
+      };
+    }
+
+    // Mostra após 2 segundos
+    setTimeout(function() {
+      banner.classList.add('visible');
+    }, 2000);
+  }
+
+  function hideBanner() {
+    banner.classList.remove('visible');
+    sessionStorage.setItem('install-dismissed', '1');
+  }
+
+  btnNo.onclick = hideBanner;
+
+  // iOS: mostra banner se não estiver em standalone e for Safari no iOS
+  if (isIOS && !isStandalone && isMobile) {
+    const isSafari = /safari/i.test(navigator.userAgent) && !/chrome|crios|fxios/i.test(navigator.userAgent);
+    if (isSafari) showBanner('ios');
+  }
+})();
+
 </script>
+
+<!-- Banner de instalação -->
+<div class="install-banner" id="install-banner">
+  <img class="install-banner-icon" src="logohbjj.png" alt="Horizonte JJ" onerror="this.style.display='none'">
+  <div class="install-banner-text">
+    <div class="install-banner-title" id="install-title">Instalar o app?</div>
+    <div class="install-banner-sub"  id="install-sub">Adicione o cronômetro à tela inicial para acesso rápido.</div>
+  </div>
+  <div class="install-banner-btns">
+    <button class="install-btn-yes" id="install-btn-yes">Instalar</button>
+    <button class="install-btn-no"  id="install-btn-no">Agora não</button>
+  </div>
+</div>
+
 </body>
 </html>
